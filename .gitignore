@@ -1,0 +1,8 @@
+.agentEnv
+.env
+__pycache__/
+*.pyc
+recorded.wav
+response.mp3
+message_log.json
+

@@ -5,42 +5,34 @@
   },
   {
     "role": "user",
-    "content": "Can you please open YouTube?"
+    "content": "Can you open github?"
   },
   {
     "role": "assistant",
-    "content": "Opening YouTube."
+    "content": "I can't directly open websites for you, but you can easily access GitHub by opening your web browser and typing \"github.com\" in the address bar. Would you like any help with navigating GitHub or any specific information related to it?"
   },
   {
     "role": "user",
-    "content": "Can you please open up Google on my laptop?"
+    "content": "Open Notion."
   },
   {
     "role": "assistant",
-    "content": "I'm sorry, but I'm unable to directly control or interact with the devices on your laptop. You'll need to manually open Google on your laptop. If you have any other questions or need assistance, feel free to ask!"
+    "content": "Searching for: notion."
   },
   {
     "role": "user",
-    "content": "Open Google on my laptop."
+    "content": "Open GitHub."
   },
   {
     "role": "assistant",
-    "content": "Opening Google."
+    "content": "Searching for: github."
   },
   {
     "role": "user",
-    "content": "Can you please open downloads?"
+    "content": "Look up best AI libraries."
   },
   {
     "role": "assistant",
-    "content": "Opening Downloads Folder."
-  },
-  {
-    "role": "user",
-    "content": "Please open Chrome."
-  },
-  {
-    "role": "assistant",
-    "content": "Launching Google Chrome."
+    "content": "Searching for: best ai libraries."
   }
 ]
