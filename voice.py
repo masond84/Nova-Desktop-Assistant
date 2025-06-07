@@ -8,6 +8,8 @@ import edge_tts
 import asyncio
 import pygame
 import os
+import time
+import random
 
 FILENAME = "recorded.wav"
 RESPONSE_AUDIO = "response.mp3"
@@ -73,20 +75,39 @@ def speak_response(text):
     print("Speaking response...")
     
     async def generate_and_play():
-        communicate = edge_tts.Communicate(text, voice="en-US-SteffanNeural")
-        await communicate.save(RESPONSE_AUDIO)
+        try:
+            communicate = edge_tts.Communicate(text, voice="en-US-SteffanNeural")
+            await communicate.save(RESPONSE_AUDIO)
 
-        if not os.path.exists(RESPONSE_AUDIO):
-            print("⚠️ File not generated.")
-            return
+            # Retry up to 5 times if the file doesnt show immediatly
+            for _ in range(5):
+                if os.path.exists(RESPONSE_AUDIO) and os.path.getsize(RESPONSE_AUDIO) > 100:
+                    break
+                time.sleep(0.2)
 
-        print(f"✅ File saved: {RESPONSE_AUDIO}")
-        pygame.mixer.init()
-        pygame.mixer.music.load(RESPONSE_AUDIO)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-        pygame.mixer.music.unload()
-        os.remove(RESPONSE_AUDIO)
+            if not os.path.exists(RESPONSE_AUDIO):
+                print("⚠️ File not generated.")
+                return
+
+            print(f"✅ File saved: {RESPONSE_AUDIO}")
+            pygame.mixer.init()
+            try:
+                pygame.mixer.music.load(RESPONSE_AUDIO)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+            except pygame.error as e:
+                print(f"Pygame audio error: {e}")
+            finally:
+                pygame.mixer.music.unload()
+                os.remove(RESPONSE_AUDIO)
+        except Exception as e:
+            print(f"Unexpected error in speak_response: {e}")    
     
-    asyncio.run(generate_and_play())
+    try:
+        asyncio.run(generate_and_play())
+    except RuntimeError:
+        # Handles nested event loops (common with threads)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(generate_and_play())

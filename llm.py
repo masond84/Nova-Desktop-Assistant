@@ -65,13 +65,29 @@ messages = [
     {"role": "system", "content": build_system_prompt()}
 ]
 
-def get_gpt_response(prompt):
+def get_gpt_response(prompt, role_override=None):
     print("Thinking...")
+
+    # Handle Proactive (system-triggered) messages first
+    if role_override == "system":
+        recent_context = [messages[0]] + messages[-message_limit:]
+        recent_context.append({"role": "system", "content": prompt})
+
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=recent_context
+        )
+
+        reply = response.choices[0].message.content
+        print(f"Assistant (Proactive): {reply}")
+        return reply
+    
+    ### === REGULAR CONVERSATION FLOW === ###
 
     # Clean leading/trailing whitespace
     stripped_prompt = prompt.strip().lower()
 
-    # CHeck for known system commands
+    # 1. Check Known System Commands
     command_result = execute_command(stripped_prompt)
     if command_result:
         # Log the command as part of the conversation
@@ -85,7 +101,7 @@ def get_gpt_response(prompt):
         print(f"Assistant (command): {command_result}")
         return command_result
     
-    # If Whisper failed to understand the user
+    # 2. Handle Unknown Input - If failed to understand user
     if not stripped_prompt or stripped_prompt in [
         "sorry, i couldn't catch that",
         "could not understand anything.",
@@ -113,7 +129,7 @@ def get_gpt_response(prompt):
         messages.append({"role": "assistant", "content": reply})
         return reply
 
-    # List memory
+    # 3. Handle Memory Listing
     if "what do you remember" in stripped_prompt or "list everything" in stripped_prompt:
         output = []
         for category, facts in long_term_memory.items():
@@ -121,7 +137,7 @@ def get_gpt_response(prompt):
                 output.append(f"{category.capitalize()}: " + ", ".join(facts))
         return "\n".join(output) if output else "I don't remember anything yet."
 
-    # FORGET FACT
+    # 4. Handle Forgetting Facts
     if stripped_prompt.startswith("forget that"):
         fact_to_forget = stripped_prompt[len("forget that"):].strip().lower()
         removed = False
@@ -138,7 +154,7 @@ def get_gpt_response(prompt):
             return f"Forgot: '{fact_to_forget}'"
         return "I couldn't find that to forget." 
 
-    # Detect if the user wants to store memory
+    # 5. Handle Memory Storage
     if stripped_prompt.startswith("remember that"):
         fact = stripped_prompt[len("remember that"):].strip()
         
@@ -170,7 +186,7 @@ def get_gpt_response(prompt):
         else:
             return "I've already remembered that."
 
-    # Add user's message to the conversation
+    # 6. Handle Regular GPT Conversation
     messages.append({"role": "user", "content": prompt})
     # Update system prompt with the current long-term memory
     messages[0]["content"] = build_system_prompt()
