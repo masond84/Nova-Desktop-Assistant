@@ -50,7 +50,7 @@ def record_audio():
             else:
                 silence_counter = 0
         
-        if triggered and silence_counter > 15:
+        if triggered and silence_counter > 7:
             raise sd.CallbackStop()
     
     try:
@@ -76,7 +76,7 @@ def speak_response(text):
     
     async def generate_and_play():
         try:
-            communicate = edge_tts.Communicate(text, voice="en-US-SteffanNeural")
+            communicate = edge_tts.Communicate(text, voice="en-US-AndrewMultilingualNeural")
             await communicate.save(RESPONSE_AUDIO)
 
             # Retry up to 5 times if the file doesnt show immediatly

@@ -56,7 +56,7 @@ def build_system_prompt():
         )
     else:
         return (
-            "You are a helpful voice assistnat named Nova."
+            "You are a helpful voice assistant named Nova."
             "You are just starting to learn about the user."
         )
 
@@ -64,6 +64,55 @@ def build_system_prompt():
 messages = [
     {"role": "system", "content": build_system_prompt()}
 ]
+
+# Helper function to classify user intent
+def classify_intent(user_input: str) -> str:
+    """
+    Use GPT to decide if the user is asking to remember, forget, or do none.
+    Returns: "remember", "forget", or "none"
+    """
+    prompt = [
+        {
+            "role": "system",
+            "content": (
+                "You categorize the user's message strictly as one of: "
+                "'remember', 'forget', or 'none'."
+                "Based off of the user's prompt and given inquiry please categorize and determine if the user wants to remember or forget something then return that intent only."
+            ),
+        },
+        {"role": "user", "content": user_input},
+    ]
+
+    result = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=prompt,
+    )
+    intent = result.choices[0].message.content.strip().lower()
+    return intent if intent in {"remember", "forget"} else "none"
+
+# Helper function to pull a fact and category from text
+def extract_fact(user_input: str) -> dict:
+    """
+    Returns : {"fact": "...", "category": "..."} using GPT
+    Categories: preferences, hobbies, locations.
+    """
+    extraction_prompt = [
+        {
+            "role": "system",
+            "content": (
+                "Extract a single fact and its category from the message. "
+                "Respond ONLY with JSON like "
+                '{"fact": "<fact>", "category": "<preferences|hobbies|locations>"}'
+            ),
+        },
+        {"role": "user", "content": user_input},
+    ]
+
+    result = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=extraction_prompt,
+    )
+    return json.loads(result.choices[0].message.content)
 
 def get_gpt_response(prompt, role_override=None):
     print("Thinking...")
@@ -86,6 +135,9 @@ def get_gpt_response(prompt, role_override=None):
 
     # Clean leading/trailing whitespace
     stripped_prompt = prompt.strip().lower()
+
+    # Classify user intent
+    intent = classify_intent(prompt)
 
     # 1. Check Known System Commands
     command_result = execute_command(stripped_prompt)
@@ -138,50 +190,40 @@ def get_gpt_response(prompt, role_override=None):
         return "\n".join(output) if output else "I don't remember anything yet."
 
     # 4. Handle Forgetting Facts
-    if stripped_prompt.startswith("forget that"):
-        fact_to_forget = stripped_prompt[len("forget that"):].strip().lower()
+    if intent == "forget":
+        fact_to_forget = prompt.strip().lower()
         removed = False
 
         for category in long_term_memory:
             original = long_term_memory[category]
-            filtered = [f for f in original if f.lower() != fact_to_forget]
+            filtered = [f for f in original if fact_to_forget not in f.lower()]
             if len(filtered) < len(original):
                 long_term_memory[category] = filtered
                 removed = True
         if removed:
             with open(memory_path, "w") as f:
                 json.dump(long_term_memory, f, indent=2)
-            return f"Forgot: '{fact_to_forget}'"
+            return f"Got it, I've learned to forget: '{fact_to_forget}'"
         return "I couldn't find that to forget." 
 
     # 5. Handle Memory Storage
-    if stripped_prompt.startswith("remember that"):
-        fact = stripped_prompt[len("remember that"):].strip()
-        
-        # Basic keyword tagging - upgrade later
-        if any(word in fact.lower() for word in ["food", "like", "love", "eat"]):
-            category = "preferences"
-        elif any(word in fact.lower() for word in ["enjoy", "run", "play", "watch", "interested"]):
-            category = "hobbies"
-        elif any(keyword in fact.lower() for keyword in [" live ", "from", "in ", "am from", "grew up", "reside", "currently live", "location", "i'm from"]):
-            category = "locations"
-        else:
-            category = "preferences"
+    if intent == "remember":
+        try:
+            info = extract_fact(prompt)
+            fact = info["fact"]
+            category = info["category"]
+        except Exception as e:
+            print(f"Memory extraction error: {e}")
+            return "Hmm, I couldn't figure out what to remember."
 
-        # Avoid duplicates
         if fact.lower() not in [f.lower() for f in long_term_memory[category]]:
             long_term_memory[category].append(fact)
-
             with open(memory_path, "w") as f:
                 json.dump(long_term_memory, f, indent=2)
-            
-            # Save to Supabase
             try:
                 store_memory(category, fact)
-                print(f"Synced to Supabase: {fact} under {category}")
             except Exception as e:
-                print(f"Failed to sync to Supabase: {e}") 
-            
+                print(f"Failed to sync to Supabase: {e}")
             return f"Got it. I'll remember that under {category}: '{fact}'"
         else:
             return "I've already remembered that."
